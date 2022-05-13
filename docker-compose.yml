@@ -1,0 +1,42 @@
+version: "2"
+
+services:
+  nodeexporter:
+    image: prom/node-exporter:v1.3.1
+    container_name: nodeexporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: unless-stopped
+    expose:
+      - 9100
+
+  httpie:
+    image: alpine/httpie:latest
+    container_name: httpie
+    entrypoint: ["sleep", "9999999"]
+
+  app:
+    image: gate-up
+    container_name: app
+    build:
+      context: .
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./:/app
+    command:
+      - "sleep"
+      - "9999999"
+
+  # busybox:
+  #   image: busybox
+  #   container_name: busybox
+  #   command:
+  #     - 'sleep'
+  #     - '3600'
