@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 docker = "~=5.0"
+prometheus-client = "~=0.14"
 
 [dev-packages]
 

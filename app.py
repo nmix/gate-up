@@ -3,8 +3,10 @@ Scrape metrics from target services and push them to PushGateway
 """
 import docker
 import logging
-# import os
 import requests
+
+from prometheus_client.parser import text_string_to_metric_families
+from prometheus_client import CollectorRegistry, push_to_gateway
 from urllib.parse import urljoin
 
 logging.basicConfig(level="INFO")
@@ -47,10 +49,26 @@ def get_container_scrape_params(container):
     return port, path
 
 
+class collector:
+    """
+    Pseudo-collector class
+    @see https://clck.ru/h3aEm
+    """
+    def __init__(self, url):
+        self.url = url
+
+    def collect(self):
+        response = requests.get(self.url)
+        return list(text_string_to_metric_families(response.text))
+
+
 for container in project_containers():
-    log("--------------------------")
+    # --- specify the metrics url
     port, path = get_container_scrape_params(container)
     url = urljoin(f"http://{container.name}:{port}", path)
-    log(url)
-    response = requests.get(url)
-    log(response.text[:200])
+    log(f"scrape metrics from {url}")
+    # ---
+    registry = CollectorRegistry()
+    registry.register(collector(url))
+    # --- push metrics to pushgateway
+    push_to_gateway('pushgateway:9091', job=container.name, registry=registry)

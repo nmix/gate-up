@@ -22,11 +22,6 @@ services:
       SCRAPE_PORT: 9100
       # SCRAPE_PATH: "/metrics"
 
-  httpie:
-    image: alpine/httpie:latest
-    container_name: httpie
-    entrypoint: ["sleep", "9999999"]
-
   app:
     image: gate-up
     container_name: app
@@ -38,6 +33,17 @@ services:
     command:
       - "sleep"
       - "9999999"
+
+  pushgateway:
+    image: prom/pushgateway
+    container_name: pushgateway
+    ports:
+      - 9091:9091
+
+  # httpie:
+  #   image: alpine/httpie:latest
+  #   container_name: httpie
+  #   entrypoint: ["sleep", "9999999"]
 
   # busybox:
   #   image: busybox
