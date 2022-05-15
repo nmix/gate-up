@@ -13,14 +13,13 @@ services:
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
     restart: unless-stopped
-    scale: 1
+    scale: 2
     expose:
       - 9100
     labels:
       - "com.github.nmix.gate-up.scrape"
     environment:
       SCRAPE_PORT: 9100
-      # SCRAPE_PATH: "/metrics"
 
   app:
     image: gate-up
@@ -30,24 +29,9 @@ services:
     volumes:
       - /var/run/docker.sock:/tmp/docker.sock:ro
       - ./:/app
-    command:
-      - "sleep"
-      - "9999999"
 
   pushgateway:
     image: prom/pushgateway
     container_name: pushgateway
     ports:
       - 9091:9091
-
-  # httpie:
-  #   image: alpine/httpie:latest
-  #   container_name: httpie
-  #   entrypoint: ["sleep", "9999999"]
-
-  # busybox:
-  #   image: busybox
-  #   container_name: busybox
-  #   command:
-  #     - 'sleep'
-  #     - '3600'

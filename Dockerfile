@@ -22,4 +22,4 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY . .
 
-CMD ["python", "-c", "print('Hello world')"]
+CMD ["python", "app.py"]

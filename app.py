@@ -3,7 +3,9 @@ Scrape metrics from target services and push them to PushGateway
 """
 import docker
 import logging
+import os
 import requests
+import time
 
 from prometheus_client.parser import text_string_to_metric_families
 from prometheus_client import CollectorRegistry, push_to_gateway
@@ -15,6 +17,10 @@ docker_client = docker.DockerClient(base_url="unix://tmp/docker.sock")
 
 WORKING_DIR_LABEL = "com.docker.compose.project.working_dir"
 SCRAPE_LABEL = "com.github.nmix.gate-up.scrape"
+
+SCRAPE_INTERVAL = int(os.environ.get("SCRAPE_INTERVAL", 5))
+if SCRAPE_INTERVAL < 1:
+    SCRAPE_INTERVAL = 1
 
 
 def log(msg):
@@ -42,6 +48,7 @@ def project_containers():
 def get_container_scrape_params(container):
     """
     return service port and path for scrape
+    source Env = ["ENV_NAME1=VAL1", "ENV_NAME2=VAL2", ...]
     """
     envd = dict([e.split("=") for e in container.attrs["Config"]["Env"]])
     port = envd.get("SCRAPE_PORT", 80)
@@ -52,6 +59,13 @@ def get_container_scrape_params(container):
 class collector:
     """
     Pseudo-collector class
+
+    To pushing metrics needs CollectorRegistry instance which works
+    only with 'collector' instances: Counter, Gauge, etc
+
+    Response from text_string_to_metric_families method is not the
+    collectror, it just generator of Metric instances.
+
     @see https://clck.ru/h3aEm
     """
     def __init__(self, url):
@@ -62,13 +76,18 @@ class collector:
         return list(text_string_to_metric_families(response.text))
 
 
-for container in project_containers():
-    # --- specify the metrics url
-    port, path = get_container_scrape_params(container)
-    url = urljoin(f"http://{container.name}:{port}", path)
-    log(f"scrape metrics from {url}")
-    # ---
-    registry = CollectorRegistry()
-    registry.register(collector(url))
-    # --- push metrics to pushgateway
-    push_to_gateway('pushgateway:9091', job=container.name, registry=registry)
+while True:
+    time.sleep(SCRAPE_INTERVAL)
+    for container in project_containers():
+        # --- specify the metrics url
+        port, path = get_container_scrape_params(container)
+        url = urljoin(f"http://{container.name}:{port}", path)
+        log(f"scrape metrics from {url}")
+        # ---
+        registry = CollectorRegistry()
+        registry.register(collector(url))
+        # --- push metrics to pushgateway
+        push_to_gateway(
+                'pushgateway:9091',
+                job=container.name,
+                registry=registry)
