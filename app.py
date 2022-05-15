@@ -18,6 +18,7 @@ docker_client = docker.DockerClient(base_url="unix://tmp/docker.sock")
 WORKING_DIR_LABEL = "com.docker.compose.project.working_dir"
 SCRAPE_LABEL = "com.github.nmix.gate-up.scrape"
 
+PUSHGATEWAY_URL = os.environ.get("PUSHGATEWAY_URL", "http://pushgateway:9091")
 SCRAPE_INTERVAL = int(os.environ.get("SCRAPE_INTERVAL", 5))
 if SCRAPE_INTERVAL < 1:
     SCRAPE_INTERVAL = 1
@@ -88,6 +89,6 @@ while True:
         registry.register(collector(url))
         # --- push metrics to pushgateway
         push_to_gateway(
-                'pushgateway:9091',
+                PUSHGATEWAY_URL,
                 job=container.name,
                 registry=registry)
