@@ -16,7 +16,7 @@ services:
     - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
   script:
     - docker build . -t zoidenberg/gate-up:$IMAGE_TAG
-    - docker push $IMAGE_NAME
+    - docker push zoidenberg/gate-up:$IMAGE_TAG
 
 build_dev:
   extends: .dockerize
