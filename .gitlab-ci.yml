@@ -6,16 +6,28 @@ image: docker:20
 services:
   - docker:dind
 
-dockerize:
+.dockerize:
   stage: build
   tags: [docker]
   variables:
-    IMAGE_NAME: zoidenberg/gate-up:$CI_COMMIT_TAG
+    IMAGE_TAG: latest
   before_script:
     - mkdir $HOME/.docker
     - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
   script:
-    - docker build . -t $IMAGE_NAME
+    - docker build . -t zoidenberg/gate-up:$IMAGE_TAG
     - docker push $IMAGE_NAME
+
+build_dev:
+  extends: .dockerize
+  variables:
+    IMAGE_TAG: dev
+  only:
+    - master
+
+build_release:
+  extends: .dockerize
+  variables:
+    IMAGE_TAG: $CI_COMMIT_TAG
   only:
     - tags
