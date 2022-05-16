@@ -37,7 +37,7 @@ def project_containers():
     try:
         app_container = docker_client.containers.get(hostname)
     except docker.errors.NotFound:
-        RuntimeError("Not in docker?")
+        raise RuntimeError("Not in docker?")
     # --- filter project containers by working project
     working_dir = app_container.labels[WORKING_DIR_LABEL]
     labels = [f"{WORKING_DIR_LABEL}={working_dir}", SCRAPE_LABEL]
