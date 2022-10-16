@@ -20,8 +20,6 @@ services:
 
 build_dev:
   extends: .dockerize
-  variables:
-    IMAGE_TAG: dev
   only:
     - master
 

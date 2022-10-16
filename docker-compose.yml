@@ -1,6 +1,39 @@
-version: "2"
+version: "3"
 
 services:
+  proxy:
+    image: traefik:v2.9
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--providers.docker"
+      - "--entrypoints.pushgateway.address=:9091"
+    ports:
+      - "8080:8080"
+      - "19091:9091"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    labels:
+      # --- basic auth for pushgateway
+      # echo $(htpasswd -nb admin admin) | sed -e s/\\$/\\$\\$/g
+      - "traefik.http.middlewares.auth.basicauth.users=admin:$$apr1$$zhYMMcXR$$HIxTpJ.7X801hOXyrxkO3/"
+
+  app:
+    image: gate-up
+    build:
+      context: .
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./:/app
+    # environment:
+    #   # --- push metrics to pushgateway with auth
+    #   PUSHGATEWAY_URL: http://pc-ip-address:19091
+    #   PUSHGATEWAY_BASIC_AUTH_USERNAME: admin
+    #   PUSHGATEWAY_BASIC_AUTH_PASSWORD: admin
+
+  # --- scaled service with own metrics
   nodeexporter:
     image: prom/node-exporter:v1.3.1
     volumes:
@@ -8,10 +41,10 @@ services:
       - /sys:/host/sys:ro
       - /:/rootfs:ro
     command:
-      - '--path.procfs=/host/proc'
-      - '--path.rootfs=/rootfs'
-      - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - "--path.procfs=/host/proc"
+      - "--path.rootfs=/rootfs"
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
     restart: unless-stopped
     scale: 2
     expose:
@@ -21,17 +54,13 @@ services:
     environment:
       SCRAPE_PORT: 9100
 
-  app:
-    image: gate-up
-    container_name: app
-    build:
-      context: .
-    volumes:
-      - /var/run/docker.sock:/tmp/docker.sock:ro
-      - ./:/app
-
+  # --- pushgateway with basic auth
   pushgateway:
     image: prom/pushgateway
-    container_name: pushgateway
-    ports:
-      - 9091:9091
+    restart: unless-stopped
+    expose:
+      - 9091
+    labels:
+      - "traefik.http.routers.pushgateway.entrypoints=pushgateway"
+      - "traefik.http.routers.pushgateway.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.pushgateway.middlewares=auth"

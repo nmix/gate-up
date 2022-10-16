@@ -42,9 +42,45 @@ services:
 
 gateup environment variables:
 
-`PUSHGATEWAY_URL` - pushgateway url for post matrics
+`PUSHGATEWAY_URL` - pushgateway url for post matrics, default `http://pushgateway:9091`
+
+`PUSHGATEWAY_BASIC_AUTH_USERNAME` - basic auth username on pushgateway, default `""`
+
+`PUSHGATEWAY_BASIC_AUTH_PASSWORD` - basic auth password on pushgateway, default `""`
+
 `SCRAPE_INTERVAL` - scrape period in seconds, default 5s
 
+
 target service environment variables:
+
 `SCRAPE_PORT` - port for scrape metrics, default: 80
+
 `SCRAPE_PATH` - path for scrape metrics, default: /metrics
+
+## Run from source
+
+```bash
+git clone https://github.com/nmix/gate-up.git
+cd gate-up
+pipenv shell
+pipenv install
+docker-compose up -d
+```
+
+Open pushgateway page on *localhost:9091* with login **admin** and password **admin**.
+
+
+## Prometheus with Basic Auth
+
+Use `PUSHGATEWAY_*` vars in app compose section for push metrics to pushgateway with enabled basic auth.
+
+```yaml
+environment:
+  PUSHGATEWAY_URL: http://pc-ip-address:19091
+  PUSHGATEWAY_BASIC_AUTH_USERNAME: admin
+  PUSHGATEWAY_BASIC_AUTH_PASSWORD: admin
+```
+
+![gate-up pushgateway example](https://clck.ru/32Nh4Y)
+
+
