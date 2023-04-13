@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "gate-up"
+version = "1.2.0"
+description = "Metrics translator from scaled services to pushgateway"
+authors = ["Nik Mikhaylichenko <nn.mikh@yandex.ru>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.7.2"
+docker = "~=5.0"
+prometheus-client = "~=0.14"
+
+[tool.poetry.group.dev.dependencies]
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

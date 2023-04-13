@@ -1,25 +1,20 @@
-# --- intermediate container
-#     install pipenv, create requirements.txt
-FROM python:3.10.4-alpine3.15 as base
+FROM python:3.11-slim
 
-RUN pip install --no-cache-dir pipenv==2022.9.24
+ENV PATH /opt/venv/bin:$PATH
+ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE 1
 
-ENV PROJECT_DIR /tmp
-WORKDIR ${PROJECT_DIR}
+WORKDIR /app
 
-COPY Pipfile Pipfile.lock ${PROJECT_DIR}/
+RUN python -m venv venv && \
+    pip install --no-cache-dir poetry==1.4.1
 
-RUN pipenv requirements > requirements.txt
+COPY pyproject.toml poetry.lock ./
 
-# --- runtime container
-#     install packages from requirements.txt
-FROM base
-
-ENV PROJECT_DIR /app
-WORKDIR ${PROJECT_DIR}
-
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+RUN poetry config virtualenvs.create false && \
+    poetry install --no-interaction --no-root --only main
 
 COPY . .
 
-CMD ["python", "app.py"]
+ENTRYPOINT ["python"]
+CMD ["app.py"]
