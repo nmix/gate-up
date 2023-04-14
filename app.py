@@ -14,41 +14,29 @@ from urllib.parse import urljoin
 
 logging.basicConfig(level='INFO')
 
-docker_client = docker.DockerClient(base_url='unix://tmp/docker.sock')
-
-WORKING_DIR_LABEL = 'com.docker.compose.project.working_dir'
-SCRAPE_LABEL = 'com.github.nmix.gate-up.scrape'
-
 PUSHGATEWAY_URL = os.environ.get('PUSHGATEWAY_URL', 'http://pushgateway:9091')
 PUSHGATEWAY_BASIC_AUTH_USERNAME = os.environ.get(
         'PUSHGATEWAY_BASIC_AUTH_USERNAME', '')
 PUSHGATEWAY_BASIC_AUTH_PASSWORD = os.environ.get(
         'PUSHGATEWAY_BASIC_AUTH_PASSWORD', '')
 
+SCRAPE_LABEL = os.environ.get('SCRAPE_LABEL', 'com.github.nmix.gate-up.scrape')
 SCRAPE_INTERVAL = int(os.environ.get('SCRAPE_INTERVAL', 5))
 if SCRAPE_INTERVAL < 1:
     SCRAPE_INTERVAL = 1
 
+DOCKER_BASE_URL = os.environ.get('DOCKER_BASE_URL', 'unix://tmp/docker.sock')
+docker_client = docker.DockerClient(base_url=DOCKER_BASE_URL)
 
-def log(msg):
-    logging.info(msg)
+JOB_PREFIX = os.environ.get('JOB_PREFIX', 'env')
 
 
 def project_containers():
     '''
     return list of compose project containers
     '''
-    # --- get current container
-    hostname = open('/etc/hostname').readline()[:-1]
-    try:
-        app_container = docker_client.containers.get(hostname)
-    except docker.errors.NotFound:
-        raise RuntimeError('Not in docker?')
-    # --- filter project containers by working project
-    working_dir = app_container.labels[WORKING_DIR_LABEL]
-    labels = [f'{WORKING_DIR_LABEL}={working_dir}', SCRAPE_LABEL]
-    containers = docker_client.containers.list(filters={'label': labels})
-    containers = [c for c in containers if c != app_container]
+    containers = docker_client.containers.list(
+            filters={'label': [SCRAPE_LABEL]})
     return containers
 
 
@@ -80,7 +68,8 @@ class collector:
 
     def collect(self):
         response = requests.get(self.url)
-        return list(text_string_to_metric_families(response.text))
+        metrics = list(text_string_to_metric_families(response.text))
+        return metrics
 
 
 def push_gateway_handler(url, method, timeout, headers, data):
@@ -103,13 +92,13 @@ while True:
         # --- specify the metrics url
         port, path = get_container_scrape_params(container)
         url = urljoin(f'http://{container.name}:{port}', path)
-        log(f'scrape metrics from {url}')
+        logging.info(f'scrape metrics from {url}')
         # ---
         registry = CollectorRegistry()
         registry.register(collector(url))
         # --- push metrics to pushgateway
         push_to_gateway(
                 PUSHGATEWAY_URL,
-                job=container.name,
+                job=f'{JOB_PREFIX}-{container.name}',
                 registry=registry,
                 handler=push_gateway_handler)

@@ -7,15 +7,18 @@ services:
       - "--api.dashboard=true"
       - "--api.insecure=true"
       - "--providers.docker"
+      - "--providers.docker.constraints=Label(`com.github.nmix.project`, `gate-up`)"
       - "--entrypoints.pushgateway.address=:9091"
     ports:
       - "8080:8080"
-      - "19091:9091"
+      - "9091:9091"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
     labels:
+      - "com.github.nmix.project=gate-up"
       # --- basic auth for pushgateway
+      - "traefik.http.routers.traefik.middlewares=auth"
       # echo $(htpasswd -nb admin admin) | sed -e s/\\$/\\$\\$/g
       - "traefik.http.middlewares.auth.basicauth.users=admin:$$apr1$$zhYMMcXR$$HIxTpJ.7X801hOXyrxkO3/"
 
@@ -27,7 +30,8 @@ services:
     volumes:
       - /var/run/docker.sock:/tmp/docker.sock:ro
       - ./:/app
-    # environment:
+    environment:
+      JOB_PREFIX: prod
     #   # --- push metrics to pushgateway with auth
     #   PUSHGATEWAY_URL: http://pc-ip-address:19091
     #   PUSHGATEWAY_BASIC_AUTH_USERNAME: admin
@@ -50,6 +54,7 @@ services:
     expose:
       - 9100
     labels:
+      - "com.github.nmix.project=gate-up"
       - "com.github.nmix.gate-up.scrape"
     environment:
       SCRAPE_PORT: 9100
@@ -61,6 +66,7 @@ services:
     expose:
       - 9091
     labels:
+      - "com.github.nmix.project=gate-up"
       - "traefik.http.routers.pushgateway.entrypoints=pushgateway"
       - "traefik.http.routers.pushgateway.rule=PathPrefix(`/`)"
       - "traefik.http.routers.pushgateway.middlewares=auth"

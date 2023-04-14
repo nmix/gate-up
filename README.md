@@ -60,10 +60,10 @@ target service environment variables:
 ## Run from source
 
 ```bash
+curl -sSL https://install.python-poetry.org | python3 -
 git clone https://github.com/nmix/gate-up.git
+
 cd gate-up
-pipenv shell
-pipenv install
 docker-compose up -d
 ```
 
