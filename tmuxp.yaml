@@ -1,0 +1,12 @@
+session_name: banana
+windows:
+  - window_name: vim
+    panes:
+      - vim .
+  - windows_name: shell
+    panes:
+      - poetry shell
+  - windows_name: python
+    panes:
+      - poetry run ipython
+    

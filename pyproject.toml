@@ -7,11 +7,12 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.7.2"
+python = "^3.8"
 docker = "~=5.0"
 prometheus-client = "~=0.14"
 
 [tool.poetry.group.dev.dependencies]
+ipython = "^8.12.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
