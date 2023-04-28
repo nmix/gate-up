@@ -12,7 +12,6 @@ from prometheus_client.exposition import basic_auth_handler
 from prometheus_client import CollectorRegistry, push_to_gateway
 from urllib.parse import urljoin
 
-logging.basicConfig(level='INFO')
 
 PUSHGATEWAY_URL = os.environ.get('PUSHGATEWAY_URL', 'http://pushgateway:9091')
 PUSHGATEWAY_BASIC_AUTH_USERNAME = os.environ.get(
@@ -29,6 +28,12 @@ DOCKER_BASE_URL = os.environ.get('DOCKER_BASE_URL', 'unix://tmp/docker.sock')
 docker_client = docker.DockerClient(base_url=DOCKER_BASE_URL)
 
 JOB_PREFIX = os.environ.get('JOB_PREFIX', 'env')
+
+LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
+
+logging.basicConfig(level=LOG_LEVEL)
+
+logging.info(f'Gate UP!')
 
 
 def project_containers():
@@ -88,7 +93,11 @@ def push_gateway_handler(url, method, timeout, headers, data):
 
 while True:
     time.sleep(SCRAPE_INTERVAL)
-    for container in project_containers():
+    containers = project_containers()
+    if len(containers) == 0:
+        logging.info('There are no project containers')
+        continue
+    for container in containers:
         # --- specify the metrics url
         port, path = get_container_scrape_params(container)
         url = urljoin(f'http://{container.name}:{port}', path)
@@ -102,3 +111,4 @@ while True:
                 job=f'{JOB_PREFIX}-{container.name}',
                 registry=registry,
                 handler=push_gateway_handler)
+

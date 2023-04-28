@@ -31,7 +31,8 @@ services:
       - /var/run/docker.sock:/tmp/docker.sock:ro
       - ./:/app
     environment:
-      JOB_PREFIX: prod
+      JOB_PREFIX: test
+    #   LOG_LEVEL: INFO
     #   # --- push metrics to pushgateway with auth
     #   PUSHGATEWAY_URL: http://pc-ip-address:19091
     #   PUSHGATEWAY_BASIC_AUTH_USERNAME: admin

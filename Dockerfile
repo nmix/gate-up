@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE 1
 WORKDIR /app
 
 RUN python -m venv venv && \
-    pip install --no-cache-dir poetry==1.4.1
+    pip install --no-cache-dir poetry==1.4.2
 
 COPY pyproject.toml poetry.lock ./
 
