@@ -4,7 +4,7 @@ Metrics translator from services to pushgateway.
 
 ## About
 
-Let's say we have some scaled worker services in docker-compose and
+Let's say we have some scaled worker services in docker-compose (or in swarm) and
 each of them have own metrics.
 We need to take metrics from each service and transfer them to prometheus
 via pushgateway.
@@ -81,6 +81,6 @@ environment:
   PUSHGATEWAY_BASIC_AUTH_PASSWORD: admin
 ```
 
-![gate-up pushgateway example](https://clck.ru/32Nh4Y)
+## Docker Swarm
 
-
+Just add environment variable `SWARM_MODE=1` into *gateup* service
