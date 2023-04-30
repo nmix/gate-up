@@ -13,12 +13,15 @@ from prometheus_client.parser import text_string_to_metric_families
 from prometheus_client.exposition import basic_auth_handler
 from prometheus_client import CollectorRegistry, push_to_gateway
 
+import glom
+
 # --- default values
 DEFAULT_SCRAPE_PORT = 80
 DEFAULT_SCRAPE_PATH = '/metrics'
 
 # --- environment config
 DOCKER_BASE_URL = os.environ.get('DOCKER_BASE_URL', 'unix://tmp/docker.sock')
+SWARM_MODE = True if os.environ.get('SWARM_MODE') else False
 JOB_PREFIX = os.environ.get('JOB_PREFIX', 'env')
 LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
 PUSHGATEWAY_URL = os.environ.get('PUSHGATEWAY_URL', 'http://pushgateway:9091')
@@ -40,6 +43,9 @@ logging.info('Gate UP!')
 @dataclasses.dataclass
 class Service():
     '''Service with metrics, e.g. docker container or swarm task
+
+    Note:
+    Do not confuse this class with swarm services
 
     Attributes:
     name - dns name (container or task name)
@@ -68,27 +74,45 @@ def host_services() -> list[Service]:
     docker_client = docker.DockerClient(base_url=DOCKER_BASE_URL)
     services = []
     for container in docker_client.containers.list():
-        service = Service(name=container.name,
-                          labels=container.attrs['Config']['Labels'],
-                          env=container.attrs['Config']['Env'])
-        services.append(service)
+        name = container.name
+        labels = glom.glom(container.attrs, 'Config.Labels')
+        env = glom.glom(container.attrs, 'Config.Env')
+        services.append(Service(name=name, labels=labels, env=env))
     return services
 
 
 def swarm_task_services() -> list[Service]:
-    '''return task services'''
+    '''return task services in swarm stack
 
-
-
-def get_container_scrape_params(container):
+    Note: task services is not swarm swarm services
     '''
-    return service port and path for scrape
-    source Env = ['ENV_NAME1=VAL1', 'ENV_NAME2=VAL2', ...]
-    '''
-    envd = dict([e.split('=') for e in container.attrs['Config']['Env']])
-    port = envd.get('SCRAPE_PORT', 80)
-    path = envd.get('SCRAPE_PATH', '/metrics')
-    return port, path
+    docker_client = docker.DockerClient(base_url=DOCKER_BASE_URL)
+    services = []
+    for swarm_service in docker_client.services.list():
+        service_name = swarm_service.name
+        labels = glom.glom(swarm_service.attrs,
+                           'Spec.TaskTemplate.ContainerSpec.Labels')
+        env = glom.glom(swarm_service.attrs,
+                        'Spec.TaskTemplate.ContainerSpec.Env')
+        for task in swarm_service.tasks():
+            if not task.get('DesiredState') == 'running':
+                continue
+            id = task['ID']
+            slot = task['Slot']
+            name = f'{service_name}.{slot}.{id}'
+            services.append(Service(name, labels=labels, env=env))
+    return services
+
+
+# def get_container_scrape_params(container):
+#     '''
+#     return service port and path for scrape
+#     source Env = ['ENV_NAME1=VAL1', 'ENV_NAME2=VAL2', ...]
+#     '''
+#     envd = dict([e.split('=') for e in container.attrs['Config']['Env']])
+#     port = envd.get('SCRAPE_PORT', 80)
+#     path = envd.get('SCRAPE_PATH', '/metrics')
+#     return port, path
 
 
 class collector:
@@ -129,24 +153,24 @@ def push_gateway_handler(url, method, timeout, headers, data):
 def main():
     while True:
         time.sleep(SCRAPE_INTERVAL)
-        # containers = project_containers()
-        # if len(containers) == 0:
-        #     logging.info('There are no project containers')
-        #     continue
-        # for container in containers:
-        #     # --- specify the metrics url
-        #     port, path = get_container_scrape_params(container)
-        #     url = urljoin(f'http://{container.name}:{port}', path)
-        #     logging.info(f'scrape metrics from {url}')
-        #     # ---
-        #     registry = CollectorRegistry()
-        #     registry.register(collector(url))
-        #     # --- push metrics to pushgateway
-        #     push_to_gateway(
-        #             PUSHGATEWAY_URL,
-        #             job=f'{JOB_PREFIX}-{container.name}',
-        #             registry=registry,
-        #             handler=push_gateway_handler)
+        if SWARM_MODE:
+            services = swarm_task_services()
+        else:
+            services = host_services()
+        # ---
+        if len(services) == 0:
+            logging.info('There are no services for scrape')
+            continue
+        for service in services:
+            logging.info(f'scrape metrics from {service.url}')
+            registry = CollectorRegistry()
+            registry.register(collector(service.url))
+            # --- push metrics to pushgateway
+            push_to_gateway(
+                    PUSHGATEWAY_URL,
+                    job=f'{JOB_PREFIX}-{service.name}',
+                    registry=registry,
+                    handler=push_gateway_handler)
 
 
 if __name__ == '__main__':
