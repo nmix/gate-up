@@ -74,10 +74,16 @@ def host_services() -> list[Service]:
     docker_client = docker.DockerClient(base_url=DOCKER_BASE_URL)
     services = []
     for container in docker_client.containers.list():
-        name = container.name
-        labels = glom.glom(container.attrs, 'Config.Labels')
-        env = glom.glom(container.attrs, 'Config.Env')
-        services.append(Service(name=name, labels=labels, env=env))
+        service = Service(container.name)
+        try:
+            service.labels = glom.glom(container.attrs, 'Config.Labels')
+        except glom.PathAccessError:
+            pass
+        try:
+            service.env = glom.glom(container.attrs, 'Config.Env')
+        except glom.PathAccessError:
+            pass
+        services.append(service)
     return services
 
 
@@ -90,34 +96,30 @@ def swarm_task_services() -> list[Service]:
     services = []
     for swarm_service in docker_client.services.list():
         service_name = swarm_service.name
-        labels = glom.glom(swarm_service.attrs,
-                           'Spec.TaskTemplate.ContainerSpec.Labels')
-        env = glom.glom(swarm_service.attrs,
-                        'Spec.TaskTemplate.ContainerSpec.Env')
         for task in swarm_service.tasks():
             if not task.get('DesiredState') == 'running':
                 continue
             id = task['ID']
             slot = task['Slot']
-            name = f'{service_name}.{slot}.{id}'
-            services.append(Service(name, labels=labels, env=env))
+            service = Service(f'{service_name}.{slot}.{id}')
+            try:
+                service.labels = glom.glom(
+                        swarm_service.attrs,
+                        'Spec.Labels')
+            except glom.PathAccessError:
+                pass
+            try:
+                service.env = glom.glom(
+                        swarm_service.attrs,
+                        'Spec.TaskTemplate.ContainerSpec.Env')
+            except glom.PathAccessError:
+                pass
+            services.append(service)
     return services
 
 
-# def get_container_scrape_params(container):
-#     '''
-#     return service port and path for scrape
-#     source Env = ['ENV_NAME1=VAL1', 'ENV_NAME2=VAL2', ...]
-#     '''
-#     envd = dict([e.split('=') for e in container.attrs['Config']['Env']])
-#     port = envd.get('SCRAPE_PORT', 80)
-#     path = envd.get('SCRAPE_PATH', '/metrics')
-#     return port, path
-
-
 class collector:
-    '''
-    Pseudo-collector class
+    '''Pseudo-collector class
 
     To pushing metrics needs CollectorRegistry instance which works
     only with 'collector' instances: Counter, Gauge, etc
@@ -137,9 +139,7 @@ class collector:
 
 
 def push_gateway_handler(url, method, timeout, headers, data):
-    '''
-    handler for passing basic auth parameters
-    '''
+    ''' handler for passing basic auth parameters '''
     return basic_auth_handler(
             url,
             method,
@@ -151,26 +151,34 @@ def push_gateway_handler(url, method, timeout, headers, data):
 
 
 def main():
+    ''' main cycle '''
     while True:
         time.sleep(SCRAPE_INTERVAL)
+        # --- get services
         if SWARM_MODE:
             services = swarm_task_services()
         else:
             services = host_services()
+        # --- filter by label
+        services = [s for s in services if SCRAPE_LABEL in s.labels]
         # ---
         if len(services) == 0:
             logging.info('There are no services for scrape')
             continue
+        # --- scrape metrics
         for service in services:
             logging.info(f'scrape metrics from {service.url}')
             registry = CollectorRegistry()
             registry.register(collector(service.url))
             # --- push metrics to pushgateway
-            push_to_gateway(
-                    PUSHGATEWAY_URL,
-                    job=f'{JOB_PREFIX}-{service.name}',
-                    registry=registry,
-                    handler=push_gateway_handler)
+            try:
+                push_to_gateway(
+                        PUSHGATEWAY_URL,
+                        job=f'{JOB_PREFIX}-{service.name}',
+                        registry=registry,
+                        handler=push_gateway_handler)
+            except Exception as err:
+                logging.error(err)
 
 
 if __name__ == '__main__':
