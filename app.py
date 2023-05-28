@@ -100,6 +100,9 @@ def swarm_task_services() -> list[Service]:
             if not task.get('DesiredState') == 'running':
                 continue
             id = task['ID']
+            if not task.get('Slot'):
+                logging.warn(f'No slot for service {service_name}')
+                continue
             slot = task['Slot']
             service = Service(f'{service_name}.{slot}.{id}')
             try:
